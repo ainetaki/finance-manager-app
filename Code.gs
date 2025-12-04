@@ -1,4 +1,4 @@
-// --- GLOBAALIT MUUTTUJAT ---
+// --- GLOBAALIT MUUTTUJAT ----
 var SETTINGS_SHEET_NAME = 'Settings';
 var TRANSLATIONS_SHEET_NAME = 'Translations';
 var CATEGORY_SETTING_KEY = 'ExpenseCategories'; 
