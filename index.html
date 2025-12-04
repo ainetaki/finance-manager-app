@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <base target="_top">
+    <meta charset="utf-8">
+    <title>Finance Manager</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+      body { background-color: #f3f4f6; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+      .glass-panel { background: white; border-radius: 16px; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); }
+      .fab-btn { position: fixed; bottom: 30px; right: 30px; width: 64px; height: 64px; border-radius: 50%; background: #10b981; color: white; display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 10px 15px -3px rgba(16, 185, 129, 0.4); cursor: pointer; transition: transform 0.2s; z-index: 50; }
+      .fab-btn:hover { transform: scale(1.1); background: #059669; }
+      .loader { border: 4px solid #f3f3f3; border-top: 4px solid #3498db; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+      .hidden-important { display: none !important; }
+      
+      .type-selector input:checked + label { background-color: #10b981; color: white; border-color: #10b981; }
+      .type-selector input:checked + label.income-label { background-color: #10b981; border-color: #10b981; }
+      .type-selector input:checked + label.expense-label { background-color: #f43f5e; border-color: #f43f5e; }
+      .type-selector input:checked + label.extra-label { background-color: #8b5cf6; border-color: #8b5cf6; } 
+      
+      .year-table th { background-color: #f9fafb; color: #374151; font-weight: 600; font-size: 0.75rem; text-transform: uppercase; padding: 0.75rem 1rem; text-align: right; }
+      .year-table th:first-child { text-align: left; }
+      .year-table td { padding: 0.75rem 1rem; border-bottom: 1px solid #f3f4f6; text-align: right; font-size: 0.875rem; color: #4b5563; }
+      .year-table td:first-child { text-align: left; font-weight: 500; }
+      
+      .month-checkbox-label {
+        cursor: pointer; display: flex; align-items: center; justify-content: center;
+        padding: 6px; border: 1px solid #e5e7eb; border-radius: 6px; font-size: 12px;
+        transition: all 0.2s;
+      }
+      .month-checkbox-input:checked + .month-checkbox-label {
+        background-color: #10b981; color: white; border-color: #10b981; font-weight: bold;
+      }
+
+      .draggable-card { cursor: grab; }
+      .draggable-card:active { cursor: grabbing; }
+      .drag-over-paid { background-color: #ecfdf5 !important; border: 2px dashed #10b981 !important; }
+      .drag-over-unpaid { background-color: #fff1f2 !important; border: 2px dashed #f43f5e !important; }
+      
+      #yearSelect, #monthSelect { -webkit-appearance: none; -moz-appearance: none; appearance: none; text-align: center; background-color: transparent; }
+      #yearSelect:focus, #monthSelect:focus { outline: none; }
+    </style>
+  </head>
+  <body class="min-h-screen flex flex-col relative">
+
+    <div id="setup-screen" class="fixed inset-0 z-[150] bg-gray-50 flex items-center justify-center hidden-important">
+        <div class="bg-white p-10 rounded-2xl shadow-2xl w-full max-w-md border border-gray-100">
+            <div class="text-center mb-8">
+                <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mx-auto mb-4 text-2xl">
+                    <i class="fa-solid fa-wand-magic-sparkles"></i>
+                </div>
+                <h1 class="text-2xl font-bold text-gray-800">Welcome</h1>
+                <p class="text-gray-500 text-sm mt-2">Let's set up your finance app.</p>
+            </div>
+
+            <form onsubmit="app.handleWizardSubmit(event)" class="space-y-6">
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">First Year</label>
+                    <input type="number" id="wizard-year" required class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none" value="2025">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Language</label>
+                        <select id="wizard-lang" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="fi">Suomi</option>
+                            <option value="en">English</option>
+                            <option value="sv">Svenska</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-bold text-gray-700 mb-1">Currency</label>
+                        <select id="wizard-currency" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                            <option value="€">EUR (€)</option>
+                            <option value="$">USD ($)</option>
+                            <option value="kr">SEK/NOK (kr)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-bold text-gray-700 mb-1">Create Password</label>
+                    <input type="text" id="wizard-password" required minlength="4" class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-emerald-500 focus:outline-none" placeholder="e.g., 1234">
+                    <p class="text-xs text-gray-400 mt-1">You will need this to login.</p>
+                </div>
+
+                <button type="submit" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 rounded-xl shadow-lg transition transform hover:-translate-y-0.5 flex justify-center items-center gap-2">
+                    <span>Start Using App</span> <i class="fa-solid fa-arrow-right"></i>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <div id="login-screen" class="fixed inset-0 z-[100] bg-white flex items-center justify-center hidden-important">
+        <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-sm border border-gray-100 text-center">
+            <h1 class="text-2xl font-bold text-gray-800 mb-2" data-i18n="login_welcome">Welcome</h1>
+            <p class="text-gray-500 text-sm mb-6" data-i18n="login_prompt">Enter Access Code</p>
+            <form onsubmit="handleLogin(event)">
+              <div class="mb-4">
+                <input type="password" id="password-input" required class="w-full px-4 py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="..." data-i18n-placeholder="login_placeholder">
+              </div>
+              <button type="submit" id="login-btn" class="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-3 rounded-lg shadow transition transform hover:-translate-y-0.5" data-i18n="login_btn">Login</button>
+            </form>
+            <p id="login-error" class="text-red-500 text-xs mt-4 hidden" data-i18n="login_error">Incorrect Password</p>
+        </div>
+    </div>
+
+    <div id="app-content" class="flex-1 flex flex-col h-full hidden-important">
+        
+        <nav class="bg-white shadow-md z-10 px-8 py-5 flex justify-between items-center">
+          <div class="flex items-center gap-8">
+              <h1 class="text-2xl font-bold text-gray-800 flex items-center">
+                  <span class="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-lg flex items-center justify-center mr-3">
+                      <i class="fa-solid fa-wallet text-xl"></i>
+                  </span>
+                  <span data-i18n="app_title">Finance Manager</span>
+              </h1>
+              <div class="flex items-center bg-gray-100 rounded-xl p-1 shadow-inner">
+                  <button onclick="app.navigateYear(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-800 transition"><i class="fa-solid fa-chevron-left"></i></button>
+                  <div class="relative mx-1"><select id="yearSelect" onchange="app.changeDate()" class="font-bold text-lg text-gray-700 cursor-pointer w-24 py-1"></select></div>
+                  <button onclick="app.navigateYear(1)" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-800 transition"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+              <div class="flex items-center bg-gray-100 rounded-xl p-1 shadow-inner">
+                  <button onclick="app.navigateMonth(-1)" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-800 transition"><i class="fa-solid fa-chevron-left"></i></button>
+                  <div class="relative mx-1">
+                      <select id="monthSelect" onchange="app.changeDate()" class="font-semibold text-gray-600 cursor-pointer w-32 py-1 text-center"></select>
+                  </div>
+                  <button onclick="app.navigateMonth(1)" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white hover:shadow-sm text-gray-500 hover:text-gray-800 transition"><i class="fa-solid fa-chevron-right"></i></button>
+              </div>
+          </div>
+          <div class="flex items-center gap-3">
+              <button onclick="app.askCreateNewYear()" class="text-sm font-semibold bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded-lg transition shadow-sm flex items-center gap-2">
+                  <i class="fa-solid fa-plus"></i> <span data-i18n="btn_new_year">New Year</span>
+              </button>
+              <button onclick="app.openSettings()" class="w-10 h-10 flex items-center justify-center rounded-lg bg-white border border-gray-200 text-gray-600 hover:bg-gray-50 hover:text-gray-800 shadow-sm transition">
+                  <i class="fa-solid fa-gear text-lg"></i>
+              </button>
+          </div>
+        </nav>
+
+        <main class="flex-1 flex p-6 gap-6 relative">
+          <div id="year-view" class="flex flex-col w-full gap-6 hidden-important">
+             
+             <div class="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-5 gap-6">
+                 
+                 <div class="md:col-span-3 xl:col-span-2 flex flex-col gap-4">
+                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                         <div class="glass-panel p-5 text-center">
+                             <p class="text-sm uppercase font-semibold text-emerald-600" data-i18n="label_total_income">Total Income</p>
+                             <h3 id="dash-total-income" class="text-2xl font-bold mt-1 text-gray-800">0.00 €</h3>
+                         </div>
+                         <div class="glass-panel p-5 text-center">
+                             <p class="text-sm uppercase font-semibold text-rose-600" data-i18n="label_total_expense">Total Expense</p>
+                             <h3 id="dash-total-expense" class="text-2xl font-bold mt-1 text-gray-800">0.00 €</h3>
+                         </div>
+                         <div class="glass-panel p-5 text-center">
+                             <p class="text-sm uppercase font-semibold text-blue-600" data-i18n="label_projected_balance">Projected Balance</p>
+                             <h3 id="dash-projected-balance" class="text-2xl font-bold mt-1 text-gray-800">0.00 €</h3>
+                         </div>
+                     </div>
+                     
+                     <div class="glass-panel p-5 flex-1 flex flex-col">
+                         <h3 class="text-xl font-bold text-gray-700 mb-4" data-i18n="label_top_categories">Top 5 Expense Categories</h3>
+                         <div class="flex justify-between border-b pb-2 mb-3">
+                             <span class="text-sm text-gray-500" data-i18n="label_avg_monthly_exp">Avg Monthly Expense:</span>
+                             <span id="dash-avg-monthly-exp" class="font-bold text-gray-700">0.00 €</span>
+                         </div>
+                         <ul id="top-categories-list" class="space-y-2 flex-1">
+                             </ul>
+                     </div>
+                 </div>
+
+                 <div class="md:col-span-3 xl:col-span-3 glass-panel p-5 flex flex-col h-full min-h-[400px]">
+                     <h3 class="text-xl font-bold text-gray-700 mb-4" data-i18n="label_category_breakdown">Category Breakdown</h3>
+                     <div class="flex-1 flex justify-center items-center relative">
+                         <canvas id="categoryChart"></canvas>
+                         <p id="category-no-data" class="text-center text-gray-400 text-sm hidden" data-i18n="dash_no_data"></p>
+                     </div>
+                 </div>
+             </div>
+             
+             <div class="glass-panel p-6 flex flex-col min-h-[400px]">
+                 <h3 class="text-xl font-bold text-gray-700 mb-4" data-i18n="financial_overview">Financial Overview</h3>
+                 <div class="flex-1 relative"><canvas id="financeChart"></canvas></div>
+             </div>
+
+             <div class="glass-panel p-0 overflow-hidden">
+                <div class="p-4 border-b border-gray-100 bg-gray-50"><h3 class="font-bold text-gray-700" data-i18n="year_summary">Annual Summary</h3></div>
+                <div class="overflow-x-auto"><table class="w-full year-table min-w-full"><thead id="year-table-head"></thead><tbody id="year-table-body"></tbody></table></div>
+             </div>
+          </div>
+          
+          <div id="month-view" class="flex w-full h-full gap-6 hidden-important">
+             <aside class="w-1/4 flex flex-col gap-6">
+                <div class="glass-panel p-5 flex flex-col gap-4 h-fit sticky top-6">
+                  
+                  <div class="flex flex-col gap-2">
+                    <h2 class="text-sm uppercase tracking-wide text-gray-500 font-bold" data-i18n="income_breakdown">Income Breakdown</h2>
+                    <div id="incomeList" class="overflow-y-auto space-y-2 pr-1 max-h-60"></div>
+                  </div>
+
+                  <div class="mt-2 border-t border-gray-100 pt-2 flex flex-col gap-2">
+                     <h2 class="text-sm uppercase tracking-wide text-gray-500 font-bold text-purple-600" data-i18n="header_extras">Budget / Extras</h2>
+                     <div id="extraList" class="overflow-y-auto space-y-2 pr-1 max-h-60"></div>
+                  </div>
+
+                  <div class="pt-4 border-t border-gray-100 space-y-1 text-sm">
+                     <div class="flex justify-between font-bold text-emerald-600"><span data-i18n="label_total_income">Total Income:</span><span id="statIncome">0</span></div>
+                     <div class="flex justify-between text-blue-600"><span data-i18n="label_paid">Paid:</span><span id="statPaid">0</span></div>
+                     <div class="flex justify-between text-rose-500"><span data-i18n="label_unpaid">Unpaid:</span><span id="statUnpaid">0</span></div>
+                     <div class="flex justify-between text-purple-600"><span data-i18n="label_extras_total">Extras:</span><span id="statExtras">0</span></div>
+                     <div class="flex justify-between font-bold text-gray-800 text-lg pt-2 border-t border-gray-100"><span data-i18n="label_balance">Balance:</span><span id="statBalance">0</span></div>
+                  </div>
+                </div>
+            </aside>
+            <section class="w-3/4 flex flex-col gap-6 overflow-hidden">
+                <div class="glass-panel flex-1 flex flex-col overflow-hidden">
+                <div class="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                    <h3 class="font-bold text-gray-700" data-i18n="bills_title">Bills</h3>
+                    <span class="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded" data-i18n="drag_tip">Tip: Drag bills to change status</span>
+                </div>
+                <div class="flex-1 flex overflow-hidden">
+                    <div id="drop-paid" class="w-1/2 border-r border-gray-100 flex flex-col bg-slate-50 transition-colors duration-200"
+                         ondragover="app.allowDrop(event)" ondragleave="app.dragLeave(event)" ondrop="app.drop(event, true)">
+                       <div id="header-paid-title" class="p-3 text-xs font-bold text-blue-600 uppercase tracking-wider text-center bg-blue-50/50 pointer-events-none">
+                           <span data-i18n="header_paid">Paid</span>
+                       </div>
+                       <div id="paidList" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+                    </div>
+                    
+                    <div id="drop-unpaid" class="w-1/2 flex flex-col bg-white transition-colors duration-200"
+                         ondragover="app.allowDrop(event)" ondragleave="app.dragLeave(event)" ondrop="app.drop(event, false)">
+                       <div id="header-unpaid-title" class="p-3 text-xs font-bold text-rose-600 uppercase tracking-wider text-center bg-rose-50/50 pointer-events-none">
+                           <span data-i18n="header_unpaid">Unpaid</span>
+                       </div>
+                       <div id="unpaidList" class="flex-1 overflow-y-auto p-4 space-y-3"></div>
+                    </div>
+                </div>
+                </div>
+            </section>
+          </div>
+        </main>
+        <div class="fab-btn" onclick="app.openModal()"><i class="fa-solid fa-plus"></i></div>
+    </div>
+
+    <div id="loader" class="fixed inset-0 bg-white z-[200] flex flex-col items-center justify-center hidden">
+        <div class="loader mb-6"></div>
+        <div id="loader-text" class="text-gray-700 font-bold text-xl animate-pulse text-center px-4">Loading...</div>
+    </div>
+
+    <div id="addBillModal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center backdrop-blur-sm">
+      <div class="bg-white rounded-2xl w-96 p-6 shadow-2xl transform transition-all scale-100 max-h-[90vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-4">
+           <h2 class="text-xl font-bold text-gray-800" id="modalTitle" data-i18n="modal_add_title">Add New Entry</h2>
+           <button id="deleteBtn" onclick="app.askDeleteEntry()" class="text-red-500 hover:text-red-700 hidden" title="Delete"><i class="fa-solid fa-trash"></i></button>
+        </div>
+        <form id="addBillForm" onsubmit="app.submitTransaction(event)">
+          <input type="hidden" name="id" id="edit-id"> 
+          
+          <div class="flex gap-2 mb-5 type-selector">
+            <div class="flex-1"><input type="radio" name="type" id="type-expense" value="expense" class="hidden" checked onchange="app.toggleType('expense')"><label for="type-expense" class="expense-label block text-center py-2 rounded-lg border border-gray-300 text-gray-600 cursor-pointer font-semibold transition hover:bg-gray-50 text-xs sm:text-sm" data-i18n="type_expense">Bill</label></div>
+            <div class="flex-1"><input type="radio" name="type" id="type-income" value="income" class="hidden" onchange="app.toggleType('income')"><label for="type-income" class="income-label block text-center py-2 rounded-lg border border-gray-300 text-gray-600 cursor-pointer font-semibold transition hover:bg-gray-50 text-xs sm:text-sm" data-i18n="type_income">Income</label></div>
+            <div class="flex-1"><input type="radio" name="type" id="type-extra" value="extra" class="hidden" onchange="app.toggleType('extra')"><label for="type-extra" class="extra-label block text-center py-2 rounded-lg border border-gray-300 text-gray-600 cursor-pointer font-semibold transition hover:bg-gray-50 text-xs sm:text-sm" data-i18n="type_extra">Other</label></div>
+          </div>
+          
+          <div class="space-y-4">
+            <div><label class="block text-sm font-medium text-gray-700 mb-1" id="label-name" data-i18n="label_name">Name / Description</label><input type="text" name="name" id="input-name" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"></div>
+            
+            <div id="category-section">
+                <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="label_category">Category</label>
+                <select id="category-select" name="category" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                    </select>
+            </div>
+            
+            <div class="grid grid-cols-2 gap-4">
+              <div><label class="block text-sm font-medium text-gray-700 mb-1"><span data-i18n="label_amount">Amount</span> (<span id="currency-symbol">€</span>)</label><input type="number" name="amount" id="input-amount" step="0.01" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"></div>
+              <div><label class="block text-sm font-medium text-gray-700 mb-1" id="label-date" data-i18n="label_date">Due Date</label><input type="date" name="date" id="input-date" required class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500"></div>
+            </div>
+            
+            <div id="recurrence-section">
+              <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="label_recurrence">Recurrence</label>
+              <select id="recurrence-select" name="repeats" onchange="app.toggleCustomMonths(this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="1" data-i18n="rec_once">Once</option>
+                <option value="2" data-i18n="rec_2m">2 Months</option>
+                <option value="3" data-i18n="rec_3m">3 Months</option>
+                <option value="6" data-i18n="rec_6m">6 Months</option>
+                <option value="12" data-i18n="rec_12m">12 Months (Year)</option>
+                <option value="custom" data-i18n="rec_custom">Select Specific Months...</option>
+              </select>
+              <div id="custom-months-container" class="grid grid-cols-4 gap-2 mt-3 hidden"></div>
+            </div>
+
+            <div class="flex items-center gap-2 pt-2 border-t border-gray-100">
+               <input type="checkbox" name="copyToNextYear" id="input-copy-next" class="w-5 h-5 accent-emerald-500 rounded cursor-pointer">
+               <label for="input-copy-next" class="text-sm font-semibold text-gray-700 cursor-pointer select-none" data-i18n="label_copy_next">Copy to next year</label>
+            </div>
+          </div>
+
+          <div class="flex justify-between mt-8">
+            <button type="button" onclick="app.closeModal('addBillModal')" class="px-4 py-2 text-rose-600 font-semibold hover:bg-rose-50 rounded-lg transition" data-i18n="btn_cancel">Cancel</button>
+            <button type="submit" class="px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow-lg transition transform hover:-translate-y-0.5" id="saveBtn" data-i18n="btn_save">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div id="settingsModal" class="fixed inset-0 bg-black/50 z-[60] hidden flex items-center justify-center backdrop-blur-sm">
+      <div class="bg-white rounded-2xl w-96 p-6 shadow-2xl max-h-[90vh] overflow-y-auto">
+        <h2 class="text-xl font-bold mb-4 text-gray-800" data-i18n="settings_title">Settings</h2>
+        <div class="space-y-4">
+           <div>
+             <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="settings_lang">Language</label>
+             <select id="langSelect" onchange="app.saveLanguage(this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="fi">Suomi</option>
+                <option value="en">English</option>
+                <option value="sv">Svenska</option>
+             </select>
+           </div>
+           <div>
+             <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="settings_currency">Currency</label>
+             <select id="currencySelect" onchange="app.saveCurrency(this.value)" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="€">EUR (€)</option>
+                <option value="$">USD ($)</option>
+                <option value="£">GBP (£)</option>
+                <option value="kr">SEK/NOK (kr)</option>
+             </select>
+           </div>
+           
+           <div>
+             <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="settings_categories">Manage Categories</label>
+             <textarea id="category-input" rows="3" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="..."></textarea>
+             <p class="text-xs text-gray-500 mt-1" data-i18n="category_hint"></p>
+             <button type="button" onclick="app.saveCategories()" class="mt-2 w-full px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg shadow transition">
+                <i class="fa-solid fa-save mr-2"></i> <span data-i18n="btn_save_categories">Save Categories</span>
+             </button>
+           </div>
+
+           <hr class="border-gray-100 my-2">
+           <div>
+             <label class="block text-sm font-medium text-gray-700 mb-1" data-i18n="settings_change_pwd">Change Password</label>
+             <div class="flex flex-col gap-2">
+                 <input type="password" id="setting-old-pwd" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="..." data-i18n-placeholder="lbl_current_pwd">
+                 <input type="password" id="setting-new-pwd" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500" placeholder="..." data-i18n-placeholder="lbl_new_pwd">
+                 <button onclick="app.handlePasswordChange()" class="mt-1 w-full px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white font-bold rounded-lg shadow transition" data-i18n="btn_update_pwd">Update</button>
+             </div>
+           </div>
+
+        </div>
+        <div class="flex justify-end mt-6">
+           <button onclick="app.closeModal('settingsModal')" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold rounded-lg transition" data-i18n="btn_close">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="alertModal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center backdrop-blur-sm">
+      <div class="bg-white rounded-2xl w-80 p-6 shadow-2xl text-center">
+        <div class="mb-4 text-rose-500 text-4xl"><i class="fa-solid fa-circle-exclamation"></i></div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2" id="alertTitle">Attention</h3>
+        <p class="text-gray-600 mb-6 text-sm" id="alertMessage">Error</p>
+        <button onclick="app.closeModal('alertModal')" class="w-full px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow transition">OK</button>
+      </div>
+    </div>
+
+    <div id="confirmModal" class="fixed inset-0 bg-black/50 z-[70] hidden flex items-center justify-center backdrop-blur-sm">
+      <div class="bg-white rounded-2xl w-80 p-6 shadow-2xl text-center">
+        <div class="mb-4 text-blue-500 text-4xl"><i class="fa-solid fa-circle-question"></i></div>
+        <h3 class="text-lg font-bold text-gray-800 mb-2" id="confirmTitle" data-i18n="confirm_title">Confirm</h3>
+        <p class="text-gray-600 mb-6 text-sm" id="confirmMessage">Are you sure?</p>
+        <div class="flex gap-3">
+           <button onclick="app.closeModal('confirmModal')" class="flex-1 px-4 py-2 text-gray-600 font-semibold hover:bg-gray-100 rounded-lg transition" data-i18n="btn_cancel">Cancel</button>
+           <button id="confirmBtn" class="flex-1 px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white font-bold rounded-lg shadow transition" data-i18n="btn_confirm">Confirm</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const app = {
+        data: null,
+        chartInstance: null, 
+        categoryChartInstance: null, 
+        translations: {},
+        currentLang: 'fi',
+        currentCurrency: '€',
+        categories: [], 
+        confirmCallback: null,
+
+        start: function() {
+           document.getElementById('loader').classList.remove('hidden');
+           google.script.run.withSuccessHandler(function(status) {
+              document.getElementById('loader').classList.add('hidden');
+              if (status.isSetup) {
+                 document.getElementById('login-screen').classList.remove('hidden-important');
+              } else {
+                 document.getElementById('setup-screen').classList.remove('hidden-important');
+                 document.getElementById('wizard-year').value = status.currentYear;
+                 document.getElementById('wizard-currency').value = '€';
+              }
+           }).checkSetupStatus();
+        },
+
+        handleWizardSubmit: function(e) {
+            e.preventDefault();
+            const year = document.getElementById('wizard-year').value;
+            const lang = document.getElementById('wizard-lang').value;
+            const currency = document.getElementById('wizard-currency').value;
+            const password = document.getElementById('wizard-password').value;
+
+            const loader = document.getElementById('loader');
+            const loaderText = document.getElementById('loader-text');
+            loader.classList.remove('hidden');
+            loaderText.textContent = "Setting up application...";
+
+            const config = { year: year, language: lang, currency: currency, password: password };
+
+            google.script.run.withSuccessHandler(function(res) {
+                loader.classList.add('hidden');
+                loaderText.textContent = "Loading...";
+                
+                if (res.success) {
+                    document.getElementById('setup-screen').classList.add('hidden-important');
+                    document.getElementById('login-screen').classList.remove('hidden-important');
+                    app.showAlert(res.message, "alert_success");
+                } else {
+                    app.showAlert("Setup Failed: " + res.message, "alert_error");
+                }
+            }).performWizardSetup(config);
+        },
+
+        init: function() {
+           google.script.run.withSuccessHandler(function(data) {
+              app.translations = data.translations;
+              app.currentLang = data.settings.Language || 'fi';
+              app.currentCurrency = data.settings.Currency || '€';
+              app.categories = data.categories || []; 
+              
+              app.setLanguage(app.currentLang);
+              document.getElementById('langSelect').value = app.currentLang;
+              document.getElementById('currencySelect').value = app.currentCurrency;
+              
+              document.getElementById('category-input').value = app.categories.join(', ');
+              
+              app.updateCurrencyUI();
+              app.loadYears();
+           }).getInitData();
+           
+           document.getElementById('confirmBtn').onclick = () => {
+             if (app.confirmCallback) app.confirmCallback();
+             app.closeModal('confirmModal');
+           };
+        },
+
+        setLanguage: function(lang) {
+            app.currentLang = lang;
+            const t = app.translations[lang] || app.translations['en'] || {};
+            
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                if(t[key]) el.textContent = t[key];
+            });
+
+            document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+                const key = el.getAttribute('data-i18n-placeholder');
+                if(t[key]) el.placeholder = t[key];
+            });
+            
+            const monthSelect = document.getElementById('monthSelect');
+            let currentVal = monthSelect.value || "0";
+            
+            monthSelect.innerHTML = `<option value="0">${t.msg_whole_year || 'Whole Year'}</option>`;
+            for(let i=1; i<=12; i++) {
+               const name = t['month_'+i] ? t['month_'+i] : i;
+               const opt = document.createElement('option');
+               opt.value = i; opt.text = name;
+               monthSelect.appendChild(opt);
+            }
+            monthSelect.value = currentVal;
+            
+            app.renderCustomMonthSelector();
+            if(app.data) {
+                app.renderYearTable();
+                app.renderYearChart();
+                if (app.data.annualSummary) app.renderCategoryChart(app.data.annualSummary.categoryBreakdown);
+            }
+        },
+        
+        saveLanguage: function(lang) {
+            app.setLanguage(lang);
+            google.script.run.saveSetting('Language', lang);
+        },
+
+        saveCurrency: function(curr) {
+            app.currentCurrency = curr;
+            app.updateCurrencyUI();
+            
+            if (app.data) {
+                 if (app.data.month === 0) {
+                     app.renderAnnualOverview(); 
+                     app.renderYearTable();
+                     app.renderYearChart();
+                     if (app.data.annualSummary) app.renderCategoryChart(app.data.annualSummary.categoryBreakdown);
+                 } else {
+                     app.renderMonthView();
+                 }
+            }
+
+            google.script.run.saveSetting('Currency', curr);
+        },
+        
+        saveCategories: function() {
+            const input = document.getElementById('category-input').value;
+            const newCategories = input.split(',').map(c => c.trim()).filter(c => c.length > 0);
+            
+            document.getElementById('loader').classList.remove('hidden');
+            google.script.run.withSuccessHandler(() => {
+                document.getElementById('loader').classList.add('hidden');
+                app.categories = newCategories; 
+                app.showAlert("Categories Saved!", "alert_success");
+            }).withFailureHandler(err => {
+                document.getElementById('loader').classList.add('hidden');
+                app.showAlert("Failed: " + err, "alert_error");
+            }).saveCategories(newCategories);
+        },
+        
+        // --- LOGIIKKA SALASANAN VAIHTAMISEEN ---
+        handlePasswordChange: function() {
+           const oldPwd = document.getElementById('setting-old-pwd').value;
+           const newPwd = document.getElementById('setting-new-pwd').value;
+           
+           if (!oldPwd || !newPwd) return;
+           
+           document.getElementById('loader').classList.remove('hidden');
+           
+           google.script.run.withSuccessHandler((res) => {
+               document.getElementById('loader').classList.add('hidden');
+               if (res.success) {
+                   app.showAlert(app.getTranslation('msg_pwd_changed'), "alert_success");
+                   document.getElementById('setting-old-pwd').value = '';
+                   document.getElementById('setting-new-pwd').value = '';
+               } else {
+                   app.showAlert(app.getTranslation('err_wrong_curr_pwd'), "alert_error");
+               }
+           }).changePassword(oldPwd, newPwd);
+        },
+
+        updateCurrencyUI: function() {
+            document.getElementById('currency-symbol').textContent = app.currentCurrency;
+        },
+
+        getTranslation: function(key) {
+           if(app.translations[app.currentLang] && app.translations[app.currentLang][key]) {
+              return app.translations[app.currentLang][key];
+           }
+           if(app.translations['en'] && app.translations['en'][key]) {
+              return app.translations['en'][key];
+           }
+           return key;
+        },
+
+        showAlert: function(msg, titleKey = "alert_error") {
+           document.getElementById('alertTitle').textContent = app.getTranslation(titleKey);
+           document.getElementById('alertMessage').textContent = msg;
+           document.getElementById('alertModal').classList.remove('hidden');
+        },
+
+        showConfirm: function(msg, callback, titleKey = "confirm_title") {
+           document.getElementById('confirmTitle').textContent = app.getTranslation(titleKey);
+           document.getElementById('confirmMessage').textContent = msg;
+           app.confirmCallback = callback;
+           document.getElementById('confirmModal').classList.remove('hidden');
+        },
+
+        closeModal: function(id) { document.getElementById(id).classList.add('hidden'); },
+        openSettings: function() { 
+            document.getElementById('category-input').value = app.categories.join(', ');
+            document.getElementById('settingsModal').classList.remove('hidden'); 
+        },
+
+        loadYears: function() {
+           google.script.run.withSuccessHandler(years => {
+             const select = document.getElementById('yearSelect');
+             select.innerHTML = '';
+             years.forEach(y => { const opt = document.createElement('option'); opt.value = y; opt.text = y; select.appendChild(opt); });
+             const currentYear = new Date().getFullYear().toString();
+             if (years.includes(currentYear)) select.value = currentYear;
+             else if (years.length > 0) select.value = years[years.length - 1]; 
+             else { const opt = document.createElement('option'); opt.value = currentYear; opt.text = currentYear; select.appendChild(opt); select.value = currentYear; }
+             app.fetchData();
+           }).getAvailableYears();
+        },
+
+        changeDate: function() { this.fetchData(); },
+
+        fetchData: function() {
+          const year = Number(document.getElementById('yearSelect').value);
+          const month = Number(document.getElementById('monthSelect').value);
+          document.getElementById('loader').classList.remove('hidden');
+          
+          google.script.run.withSuccessHandler(this.render).withFailureHandler(err => {
+              document.getElementById('loader').classList.add('hidden');
+              app.showAlert(err);
+          }).getData(year, month);
+        },
+
+        render: function(response) {
+          document.getElementById('loader').classList.add('hidden');
+          if (response.error) { 
+             if(response.error.includes("Year not found")) {
+                app.showConfirm(app.getTranslation('err_year_missing_q'), () => { app.performCreateYear(); }, "alert_error");
+             } else {
+                app.showAlert(response.error);
+             }
+             return; 
+          }
+          app.data = response;
+          if (response.month === 0) {
+            document.getElementById('year-view').classList.remove('hidden-important');
+            document.getElementById('month-view').classList.add('hidden-important');
+            app.renderAnnualOverview(); 
+            app.renderYearTable();
+            app.renderYearChart();
+            app.renderCategoryChart(response.annualSummary.categoryBreakdown); 
+          } else {
+            document.getElementById('year-view').classList.add('hidden-important');
+            document.getElementById('month-view').classList.remove('hidden-important');
+            app.renderMonthView();
+          }
+        },
+
+        renderAnnualOverview: function() {
+            const summary = app.data.annualSummary;
+            const c = app.currentCurrency + ' ';
+
+            document.getElementById('dash-total-income').textContent = Number(summary.totalIncome).toFixed(2) + ' ' + c;
+            document.getElementById('dash-total-expense').textContent = Number(summary.totalExpense).toFixed(2) + ' ' + c;
+            document.getElementById('dash-avg-monthly-exp').textContent = Number(summary.averageMonthlyExpense).toFixed(2) + ' ' + c;
+
+            const balance = Number(summary.projectedBalance);
+            const balanceEl = document.getElementById('dash-projected-balance');
+            balanceEl.textContent = balance.toFixed(2) + ' ' + c;
+            balanceEl.className = 'text-2xl font-bold mt-1 ' + (balance >= 0 ? 'text-emerald-600' : 'text-rose-600');
+
+            const topList = document.getElementById('top-categories-list');
+            topList.innerHTML = '';
+            
+            if (summary.topCategories && summary.topCategories.length > 0) {
+                summary.topCategories.forEach((cat, index) => {
+                    const listItem = document.createElement('li');
+                    listItem.className = 'flex justify-between text-sm';
+                    const amount = Number(cat.total);
+                    listItem.innerHTML = `<span>${index + 1}. ${cat.name}</span><span class="font-semibold text-rose-600">${amount.toFixed(2)} ${c}</span>`;
+                    topList.appendChild(listItem);
+                });
+            } else {
+                topList.innerHTML = `<li class="text-gray-500 text-sm italic">${app.getTranslation('dash_no_data')}</li>`;
+            }
+        },
+
+        renderCategoryChart: function(breakdown) {
+            if (app.categoryChartInstance) {
+                app.categoryChartInstance.destroy();
+            }
+
+            const canvas = document.getElementById('categoryChart');
+            const noDataEl = document.getElementById('category-no-data');
+
+            const labels = Object.keys(breakdown).filter(key => breakdown[key] > 0);
+            const data = labels.map(key => breakdown[key]);
+            
+            if (data.length === 0) {
+                canvas.classList.add('hidden');
+                noDataEl.classList.remove('hidden');
+                return;
+            } else {
+                canvas.classList.remove('hidden');
+                noDataEl.classList.add('hidden');
+            }
+
+            const colors = data.map((_, index) => {
+                const hue = (index * 137) % 360; 
+                return `hsl(${hue}, 70%, 50%)`;
+            });
+            
+            app.categoryChartInstance = new Chart(canvas, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: colors,
+                        hoverOffset: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'right' },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const amount = context.parsed;
+                                    const label = context.label;
+                                    return `${label}: ${amount.toFixed(2)} ${app.currentCurrency}`;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        },
+
+        renderCategorySelector: function(selectedCategory = '') {
+            const select = document.getElementById('category-select');
+            select.innerHTML = '';
+            
+            const noCatText = app.getTranslation('no_category');
+            
+            let defaultOpt = document.createElement('option');
+            defaultOpt.value = 'Ei kategoriaa';
+            defaultOpt.textContent = noCatText;
+            select.appendChild(defaultOpt);
+
+            app.categories.forEach(cat => {
+                let opt = document.createElement('option');
+                opt.value = cat;
+                opt.textContent = cat;
+                select.appendChild(opt);
+            });
+            
+            select.value = selectedCategory || 'Ei kategoriaa';
+        },
+        
+        renderCustomMonthSelector: function() {
+           const container = document.getElementById('custom-months-container');
+           container.innerHTML = '';
+           const t = app.translations[app.currentLang] || {};
+           for(let i=1; i<=12; i++) {
+              const name = t['month_'+i] ? t['month_'+i].substring(0,3) : i; 
+              const wrapper = document.createElement('div');
+              wrapper.innerHTML = `<input type="checkbox" name="customMonths" value="${i}" id="cm-${i}" class="hidden month-checkbox-input"><label for="cm-${i}" class="month-checkbox-label">${name}</label>`;
+              container.appendChild(wrapper);
+           }
+        },
+
+        toggleCustomMonths: function(val) {
+           const container = document.getElementById('custom-months-container');
+           if(val === 'custom') container.classList.remove('hidden');
+           else container.classList.add('hidden');
+        },
+
+        navigateYear: function(offset) {
+            const select = document.getElementById('yearSelect');
+            const currentYear = parseInt(select.value);
+            const targetYear = currentYear + offset;
+            let exists = false;
+            for(let i=0; i<select.options.length; i++) { if(parseInt(select.options[i].value) === targetYear) { exists = true; break; } }
+            if(exists) { select.value = targetYear; app.fetchData(); } 
+            else if (offset > 0) { 
+               app.showConfirm(app.getTranslation('err_year_missing_q'), () => { app.performCreateYear(); }, "alert_error");
+            }
+            else { app.showAlert(app.getTranslation('err_year_not_found'), "alert_error"); }
+        },
+
+        navigateMonth: function(offset) {
+            const select = document.getElementById('monthSelect');
+            let val = parseInt(select.value);
+            if (isNaN(val)) val = 0;
+            let next = val + offset;
+            if (next > 12) next = 0; if (next < 0) next = 12;
+            select.value = next; app.changeDate();
+        },
+
+        renderYearTable: function() {
+          const tbody = document.getElementById('year-table-body');
+          const thead = document.getElementById('year-table-head');
+          const t = app.translations[app.currentLang] || {};
+          const c = app.currentCurrency + ' ';
+          thead.innerHTML = `<tr><th>${t.table_month||'Month'}</th><th>${t.table_bills||'Bills'}</th><th>${t.table_exp||'Exp'}</th><th>${t.table_inc||'Inc'}</th><th>${t.table_surplus||'Surplus'}</th></tr>`;
+          tbody.innerHTML = '';
+          app.data.monthlyStats.forEach((stat, index) => {
+            const surplus = stat.income - stat.expense;
+            const monthName = t['month_'+(index+1)] ? t['month_'+(index+1)] : (index+1);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `<td>${monthName}</td><td>${stat.billCount}</td><td class="text-rose-600">${stat.expense.toFixed(2)} ${c}</td><td class="text-emerald-600">${stat.income.toFixed(2)} ${c}</td><td class="${surplus>=0?'text-gray-700':'text-red-500'}">${surplus.toFixed(2)} ${c}</td>`;
+            tbody.appendChild(tr);
+          });
+          if (app.data.monthlyStats.length === 0) {
+              tbody.innerHTML = `<tr><td colspan="5" class="text-center p-4 text-gray-500 italic">${app.getTranslation('dash_no_data')}</td></tr>`;
+          }
+        },
+
+        renderYearChart: function() {
+          const ctx = document.getElementById('financeChart').getContext('2d');
+          const t = app.translations[app.currentLang] || {};
+          const monthLabels = [];
+          for(let i=1; i<=12; i++) monthLabels.push(t['month_'+i] ? t['month_'+i] : i);
+
+          if (app.chartInstance) app.chartInstance.destroy();
+          
+          const maxVal = Math.max(...app.data.monthlyStats.flatMap(s => [s.income, s.expense, Math.abs(s.income - s.expense)]));
+
+          app.chartInstance = new Chart(ctx, {
+            type: 'bar',
+            data: {
+              labels: monthLabels,
+              datasets: [
+                { type: 'line', label: t.table_surplus||'Surplus', data: app.data.monthlyStats.map(s=>s.income-s.expense), borderColor: '#ef4444', borderWidth: 2, fill: false, tension: 0.4 },
+                { label: t.table_exp||'Expenses', data: app.data.monthlyStats.map(s=>s.expense), backgroundColor: 'rgba(59, 130, 246, 0.6)' },
+                { label: t.table_inc||'Income', data: app.data.monthlyStats.map(s=>s.income), backgroundColor: 'rgba(16, 185, 129, 0.6)' }
+              ]
+            },
+            options: { 
+                responsive: true, 
+                maintainAspectRatio: false, 
+                scales: { 
+                    y: { beginAtZero: true, suggestedMax: maxVal * 1.15 },
+                    x: { stacked: true }
+                } 
+            }
+          });
+        },
+
+        renderMonthView: function() {
+          let incomeTotal = 0, paid = 0, unpaid = 0, extrasTotal = 0;
+          // MUUTOS: Lisätty laskurit kappalemäärille
+          let paidCount = 0, unpaidCount = 0; 
+          
+          const incomeListDiv = document.getElementById('incomeList');
+          const paidListDiv = document.getElementById('paidList');
+          const unpaidListDiv = document.getElementById('unpaidList');
+          const extraListDiv = document.getElementById('extraList'); 
+          
+          incomeListDiv.innerHTML = ''; paidListDiv.innerHTML = ''; unpaidListDiv.innerHTML = ''; extraListDiv.innerHTML = '';
+
+          const bills = app.data.bills.filter(b => b.type === 'expense' || !b.type); 
+          const incomes = app.data.bills.filter(b => b.type === 'income');
+          const extras = app.data.bills.filter(b => b.type === 'extra');
+          
+          const c = app.currentCurrency + ' ';
+
+          // 1. Renderöi tulot
+          incomes.forEach(inc => {
+             incomeTotal += Number(inc.amount);
+             const item = document.createElement('div');
+             item.className = "flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded cursor-pointer group";
+             item.innerHTML = `<div class="flex items-center gap-2"><span>${inc.name}</span>${inc.copyNext ? '<i class="fa-solid fa-arrows-rotate text-emerald-500 text-[10px]" title="Renew"></i>' : ''}</div><span class="font-bold text-gray-700">${Number(inc.amount).toFixed(2)} ${c}<i class="fa-solid fa-pencil text-gray-300 group-hover:text-gray-500 ml-2 text-xs"></i></span>`;
+             item.onclick = () => app.openModal(inc);
+             incomeListDiv.appendChild(item);
+          });
+
+          // 2. Renderöi muut menot (extra)
+          extras.forEach(ext => {
+             extrasTotal += Number(ext.amount);
+             const item = document.createElement('div');
+             item.className = "flex justify-between items-center text-sm p-2 hover:bg-gray-50 rounded cursor-pointer group border-l-2 border-purple-500 pl-3";
+             item.innerHTML = `<div class="flex items-center gap-2"><span>${ext.name}</span>${ext.copyNext ? '<i class="fa-solid fa-arrows-rotate text-purple-400 text-[10px]" title="Renew"></i>' : ''}</div><span class="font-bold text-gray-700">${Number(ext.amount).toFixed(2)} ${c}<i class="fa-solid fa-pencil text-gray-300 group-hover:text-gray-500 ml-2 text-xs"></i></span>`;
+             item.onclick = () => app.openModal(ext);
+             extraListDiv.appendChild(item);
+          });
+
+          // 3. Renderöi laskut (paid/unpaid)
+          bills.forEach(bill => {
+            if (bill.paid) {
+                paid += Number(bill.amount);
+                paidCount++; // MUUTOS: Kasvata maksettujen määrää
+            } else {
+                unpaid += Number(bill.amount);
+                unpaidCount++; // MUUTOS: Kasvata maksamattomien määrää
+            }
+
+            const card = document.createElement('div');
+            card.className = "draggable-card bg-white p-3 rounded-lg shadow-sm border border-gray-100 hover:shadow-md transition flex justify-between items-center group";
+            if (bill.paid) card.classList.add('opacity-75');
+            card.draggable = true; card.ondragstart = (e) => app.dragStart(e, bill.id);
+            const content = document.createElement('div'); content.className = "flex-1 cursor-pointer";
+            
+            const categoryDisplay = bill.category && bill.category !== 'Ei kategoriaa' ? `<span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">${bill.category}</span>` : '';
+            
+            content.innerHTML = `<div class="font-bold text-gray-800 text-sm flex items-center gap-2">${bill.name} ${bill.copyNext ? '<i class="fa-solid fa-arrows-rotate text-emerald-500 text-[10px]" title="Renew"></i>' : ''}</div><div class="flex items-center gap-2 mt-1"><div class="text-xs ${bill.paid ? 'text-green-600' : 'text-orange-500'}"><i class="fa-regular fa-calendar mr-1"></i>${bill.dueDate}</div>${categoryDisplay}</div>`;
+            
+            content.onclick = (e) => { app.openModal(bill); e.stopPropagation(); };
+            const actions = document.createElement('div'); actions.className = "flex items-center gap-3";
+            actions.innerHTML = `<div class="font-bold text-gray-700">${Number(bill.amount).toFixed(2)} ${c}</div>`;
+            const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = bill.paid; checkbox.className = "checkbox-lg accent-emerald-500 rounded cursor-pointer";
+            checkbox.onclick = (e) => e.stopPropagation(); 
+            checkbox.onchange = () => app.toggleBill(bill.id, !bill.paid);
+            actions.appendChild(checkbox); card.appendChild(content); card.appendChild(actions);
+            if (bill.paid) paidListDiv.appendChild(card); else unpaidListDiv.appendChild(card);
+          });
+
+          // --- MUUTOS: Päivitä otsikot KAPPALEMÄÄRILLÄ ---
+          const paidLabel = app.getTranslation('header_paid') || 'Paid';
+          const unpaidLabel = app.getTranslation('header_unpaid') || 'Unpaid';
+          
+          // Nyt näytetään esim: "MAKSETUT: 5"
+          document.getElementById('header-paid-title').textContent = `${paidLabel}: ${paidCount}`;
+          document.getElementById('header-unpaid-title').textContent = `${unpaidLabel}: ${unpaidCount}`;
+          // ----------------------------------------
+
+          // Päivitä yhteenvetolaatikko (vasen laita) - Nämä pysyvät euroina
+          document.getElementById('statIncome').textContent = incomeTotal.toFixed(2) + ' ' + c;
+          document.getElementById('statPaid').textContent = paid.toFixed(2) + ' ' + c;
+          document.getElementById('statUnpaid').textContent = unpaid.toFixed(2) + ' ' + c;
+          document.getElementById('statExtras').textContent = extrasTotal.toFixed(2) + ' ' + c;
+          document.getElementById('statBalance').textContent = (incomeTotal - paid - unpaid - extrasTotal).toFixed(2) + ' ' + c;
+        },
+
+        dragStart: function(e, id) { e.dataTransfer.setData("text/plain", id); },
+        allowDrop: function(e) { e.preventDefault(); if (e.currentTarget.id === 'drop-paid') e.currentTarget.classList.add('drag-over-paid'); else if (e.currentTarget.id === 'drop-unpaid') e.currentTarget.classList.add('drag-over-unpaid'); },
+        dragLeave: function(e) { document.getElementById('drop-paid').classList.remove('drag-over-paid'); document.getElementById('drop-unpaid').classList.remove('drag-over-unpaid'); },
+        drop: function(e, targetStatusIsPaid) {
+           e.preventDefault();
+           document.getElementById('drop-paid').classList.remove('drag-over-paid');
+           document.getElementById('drop-unpaid').classList.remove('drag-over-unpaid');
+           const id = e.dataTransfer.getData("text/plain");
+           if (id) {
+               const bill = app.data.bills.find(b => b.id === id);
+               if (bill && bill.paid !== targetStatusIsPaid) app.toggleBill(id, targetStatusIsPaid);
+           }
+        },
+
+        toggleBill: function(id, newState) {
+          const year = Number(document.getElementById('yearSelect').value);
+          const bill = app.data.bills.find(b => b.id === id);
+          if(bill) bill.paid = newState;
+          app.renderMonthView();
+          google.script.run.withFailureHandler(err => { 
+              app.showAlert("Error"); bill.paid = !newState; app.renderMonthView(); 
+          }).toggleBillStatus(id, year, newState);
+        },
+
+        openModal: function(entry = null) {
+          document.getElementById('addBillModal').classList.remove('hidden');
+          const t = app.translations[app.currentLang] || {};
+          
+          if (entry) {
+            document.getElementById('modalTitle').textContent = t.modal_edit_title || "Edit";
+            document.getElementById('edit-id').value = entry.id;
+            document.getElementById('input-name').value = entry.name;
+            document.getElementById('input-amount').value = entry.amount;
+            document.getElementById('input-date').value = entry.dueDate;
+            document.getElementById('input-copy-next').checked = (entry.copyNext === true); 
+            
+            if (entry.type === 'income') { 
+                document.getElementById('type-income').checked = true; app.toggleType('income'); 
+            } else if (entry.type === 'extra') {
+                document.getElementById('type-extra').checked = true; app.toggleType('extra');
+            } else { 
+                document.getElementById('type-expense').checked = true; app.toggleType('expense'); 
+            }
+            
+            if (entry.type === 'expense') {
+                app.renderCategorySelector(entry.category);
+            } else {
+                app.renderCategorySelector('Ei kategoriaa'); 
+            }
+
+            document.getElementById('recurrence-section').classList.add('hidden');
+            document.getElementById('deleteBtn').classList.remove('hidden');
+          } else {
+            document.getElementById('modalTitle').textContent = t.modal_add_title || "Add";
+            document.getElementById('edit-id').value = "";
+            document.getElementById('addBillForm').reset();
+            document.getElementById('input-copy-next').checked = false;
+            let month = document.getElementById('monthSelect').value;
+            const year = document.getElementById('yearSelect').value;
+            if (month === "0") month = (new Date().getMonth() + 1).toString();
+            document.getElementById('input-date').value = `${year}-${month.toString().padStart(2, '0')}-01`;
+            document.getElementById('type-expense').checked = true; app.toggleType('expense');
+            document.getElementById('recurrence-section').classList.remove('hidden');
+            document.getElementById('recurrence-select').value = "1";
+            app.toggleCustomMonths("1");
+            document.getElementById('deleteBtn').classList.add('hidden');
+          }
+        },
+
+        toggleType: function(type) {
+           const saveBtn = document.getElementById('saveBtn');
+           const categorySection = document.getElementById('category-section'); 
+           const t = app.translations[app.currentLang] || {};
+           
+           if (type === 'income') {
+             document.getElementById('label-name').textContent = t.label_source || "Source"; 
+             document.getElementById('label-date').textContent = t.label_date_received || "Date";
+             saveBtn.className = "px-6 py-2 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-lg shadow-lg transition transform hover:-translate-y-0.5";
+             categorySection.classList.add('hidden'); 
+           } else if (type === 'extra') {
+             document.getElementById('label-name').textContent = t.label_name || "Name"; 
+             document.getElementById('label-date').textContent = t.label_date_general || "Date";
+             saveBtn.className = "px-6 py-2 bg-purple-500 hover:bg-purple-600 text-white font-bold rounded-lg shadow-lg transition transform hover:-translate-y-0.5";
+             categorySection.classList.add('hidden'); 
+           } else { 
+             document.getElementById('label-name').textContent = t.label_name || "Name"; 
+             document.getElementById('label-date').textContent = t.label_date || "Date";
+             saveBtn.className = "px-6 py-2 bg-rose-500 hover:bg-rose-600 text-white font-bold rounded-lg shadow-lg transition transform hover:-translate-y-0.5";
+             categorySection.classList.remove('hidden'); 
+             app.renderCategorySelector(); 
+           }
+        },
+
+        submitTransaction: function(e) {
+          e.preventDefault();
+          const form = e.target;
+          const id = document.getElementById('edit-id').value;
+          const type = form.querySelector('input[name="type"]:checked').value;
+          
+          const customMonths = [];
+          if (form.repeats && form.repeats.value === 'custom') {
+            form.querySelectorAll('input[name="customMonths"]:checked').forEach(cb => customMonths.push(cb.value));
+            if (customMonths.length === 0 && !id && type !== 'income' && type !== 'extra') { app.showAlert("Please select a month for recurring item.", "alert_error"); return; }
+          }
+          
+          const categoryValue = type === 'expense' ? document.getElementById('category-select').value : 'Ei kategoriaa'; 
+
+          const formData = {
+            id: id,
+            type: type,
+            category: categoryValue, 
+            name: form.name.value, amount: form.amount.value, date: form.date.value, 
+            repeats: form.repeats ? form.repeats.value : "1",
+            customMonths: customMonths,
+            copyToNextYear: form.querySelector('input[name="copyToNextYear"]').checked 
+          };
+          
+          const btn = form.querySelector('button[type="submit"]');
+          const originalText = btn.textContent; btn.textContent = "..."; btn.disabled = true;
+          const action = id ? 'editTransaction' : 'saveTransaction';
+          const resetBtn = () => { btn.textContent = originalText; btn.disabled = false; };
+          
+          google.script.run.withSuccessHandler((res) => { 
+             resetBtn(); 
+             if (res.success) { app.closeModal('addBillModal'); app.fetchData(); } else { app.showAlert(res.message); } 
+          }).withFailureHandler((err) => { resetBtn(); app.showAlert(err); })[action](formData);
+        },
+        
+        askDeleteEntry: function() { app.showConfirm("Delete?", () => { app.performDelete(); }, "alert_error"); },
+        performDelete: function() {
+           const id = document.getElementById('edit-id').value;
+           const year = document.getElementById('yearSelect').value;
+           if (!id) return;
+           google.script.run.withSuccessHandler((res) => { if (res.success) { app.closeModal('addBillModal'); app.fetchData(); } else { app.showAlert(res.message); } }).deleteTransaction(id, year);
+        },
+        askCreateNewYear: function() { app.showConfirm(app.getTranslation("msg_create_year_q"), () => { app.performCreateYear(); }, "alert_success"); },
+        performCreateYear: function() { const loader = document.getElementById('loader'); const loaderText = document.getElementById('loader-text'); loaderText.textContent = app.getTranslation('msg_creating_year') || "Creating new year..."; loader.classList.remove('hidden'); google.script.run.withSuccessHandler((res) => { loader.classList.add('hidden'); loaderText.textContent = "Loading..."; app.showAlert(res.message, res.success ? "alert_success" : "alert_error"); if(res.success) app.loadYears(); }).withFailureHandler((err) => { loader.classList.add('hidden'); loaderText.textContent = "Loading..."; app.showAlert(err); }).createNextYear(); },
+        handleLogin: function(e) { e.preventDefault(); const pwd = document.getElementById('password-input').value; const btn = document.getElementById('login-btn'); btn.textContent = "..."; btn.disabled = true; google.script.run.withSuccessHandler(function(isValid) { btn.textContent = "Login"; btn.disabled = false; if (isValid) { document.getElementById('login-screen').classList.add('hidden-important'); document.getElementById('app-content').classList.remove('hidden-important'); app.init(); } else { document.getElementById('login-error').classList.remove('hidden'); } }).checkLogin(pwd); }
+      };
+
+      window.onload = app.start;
+      window.handleLogin = app.handleLogin;
+    </script>
+  </body>
+</html>
