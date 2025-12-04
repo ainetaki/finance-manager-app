@@ -1,5 +1,5 @@
 # finance-manager-app
-A personal finance tracker built with Google Apps Script
+A personal finance tracker built with Google Apps Script WHERE YOU OWN YOUR DATA!
 
 Finance Manager (Google Apps Script Web App)
 A modern, lightweight, and responsive personal finance tracker that runs entirely on Google Sheets.
