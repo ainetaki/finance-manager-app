@@ -113,3 +113,25 @@ Settings: Click the gear icon to change language, currency, update categories, o
 
 📄 License
 This project is open-source and available under the MIT License. You are free to use, modify, and distribute it.
+
+🔐 Security & Architecture
+
+This application was built with a "Privacy First" architecture. Unlike many finance apps that store your data on external third-party servers, Finance Manager runs entirely within your personal Google ecosystem.
+
+Here is how the security is implemented technically:
+
+1. Data Sovereignty (Google Sheets)
+No External Database: All financial data is stored in your personal Google Sheet. No data is ever sent to an external server, analytics platform, or third-party database.
+Ownership: You are the sole owner of the data. If you delete the spreadsheet, the data is gone forever. No copies exist elsewhere.
+
+2. Server-Side Authentication
+Secure Password Storage: The application uses a custom password protection system. The password you create during setup is not stored in the HTML code or JavaScript files where it could be seen by "Viewing Source".
+- Implementation: The password is saved using Google Apps Script's PropertiesService.getScriptProperties(). This is a secure, server-side key-value store that is inaccessible to the client-side browser.
+- Verification: When you log in, your input is sent to the backend (Google Server). The comparison happens on the server, and only a boolean true/false is returned to the browser.
+
+3. Execution Context
+"Execute as Me": The Web App is deployed to run under your authority (Execute as: Me). This means the script relies on your Google Account's existing security (including your 2-Factor Authentication if enabled on your Google Account).
+Access Control: By setting the deployment access to Only myself, you ensure that even if someone guesses your Web App URL, they cannot access the application without being logged into your Google Account and knowing the app-specific password.
+
+4. Code Transparency
+Open Source: Since you host the code yourself within the Google Sheet's script editor, you have full visibility. There is no compiled or obfuscated code—what you see is exactly what runs.
