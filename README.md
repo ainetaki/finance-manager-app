@@ -8,7 +8,7 @@ This application is built as a Single Page Application (SPA) using Google Apps S
 
 
 
-✨ Key Features
+Key Features
 📊 Interactive Dashboard: Annual overview with charts (Chart.js) showing income, expenses, and surplus.
 <img width="1900" height="1022" alt="image" src="https://github.com/user-attachments/assets/b7ecb86d-0195-44f6-adad-23bf196c52b0" />
 
